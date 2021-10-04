@@ -1,6 +1,8 @@
-#!/bin/bash
+#!/bin/bash -e
 
 cd $(dirname $0)
+
+export PATH="$PATH:$HOME/go/bin"
 
 export GOOS=""
 export GOARCH=""
@@ -10,7 +12,13 @@ export GOARCH=""
 cd ../restapi
 
 echo "Running tests..."
-if ! go test;then
+if ! go test "$@";then
   echo "Failed testing. Aborting."
   exit 1
 fi
+
+#echo "Vetting result..."
+#go vet ./...
+
+#echo "Checking for linting..."
+#golint -set_exit_status ./...

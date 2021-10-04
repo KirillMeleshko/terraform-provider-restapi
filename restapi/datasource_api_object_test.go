@@ -9,31 +9,32 @@ package restapi
 
 import (
 	"fmt"
-	"github.com/Mastercard/terraform-provider-restapi/fakeserver"
-	"github.com/hashicorp/terraform/helper/resource"
 	"os"
 	"testing"
+
+	"github.com/Mastercard/terraform-provider-restapi/fakeserver"
+	"github.com/hashicorp/terraform/helper/resource"
 )
 
 func TestAccRestapiobject_Basic(t *testing.T) {
 	debug := false
-	api_server_objects := make(map[string]map[string]interface{})
+	apiServerObjects := make(map[string]map[string]interface{})
 
-	svr := fakeserver.NewFakeServer(8082, api_server_objects, true, debug, "")
+	svr := fakeserver.NewFakeServer(8082, apiServerObjects, true, debug, "")
 	os.Setenv("REST_API_URI", "http://127.0.0.1:8082")
 
 	opt := &apiClientOpt{
-		uri:                   "http://127.0.0.1:8082/",
-		insecure:              false,
-		username:              "",
-		password:              "",
-		headers:               make(map[string]string, 0),
-		timeout:               2,
-		id_attribute:          "id",
-		copy_keys:             make([]string, 0),
-		write_returns_object:  false,
-		create_returns_object: false,
-		debug:                 debug,
+		uri:                 "http://127.0.0.1:8082/",
+		insecure:            false,
+		username:            "",
+		password:            "",
+		headers:             make(map[string]string),
+		timeout:             2,
+		idAttribute:         "id",
+		copyKeys:            make([]string, 0),
+		writeReturnsObject:  false,
+		createReturnsObject: false,
+		debug:               debug,
 	}
 	client, err := NewAPIClient(opt)
 	if err != nil {
@@ -41,7 +42,7 @@ func TestAccRestapiobject_Basic(t *testing.T) {
 	}
 
 	/* Send a simple object */
-	client.send_request("POST", "/api/objects", `
+	client.sendRequest("POST", "/api/objects", `
     {
       "id": "1234",
       "first": "Foo",
@@ -51,7 +52,7 @@ func TestAccRestapiobject_Basic(t *testing.T) {
       }
     }
   `)
-	client.send_request("POST", "/api/objects", `
+	client.sendRequest("POST", "/api/objects", `
     {
       "id": "4321",
       "first": "Foo",
@@ -61,7 +62,7 @@ func TestAccRestapiobject_Basic(t *testing.T) {
       }
     }
   `)
-	client.send_request("POST", "/api/objects", `
+	client.sendRequest("POST", "/api/objects", `
     {
       "id": "5678",
       "first": "Nested",
@@ -143,26 +144,25 @@ func TestAccRestapiobject_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr("data.restapi_object.Baz", "api_data.last", "Baz"),
 				),
 			},
-			/* TODO: Fails with fakeserver because a request for /api/objects/people/4321 is unexpected (400 error)
-			      Find a way to test this effectively
-			   {
-			     Config: fmt.Sprintf(`
+			{
+				/* Perform a test that mimicks a search (this will exercise search_path and results_key */
+				Config: fmt.Sprintf(`
 			         data "restapi_object" "Baz" {
-			            path = "/api/objects/people"
+			            path = "/api/objects"
+			            search_path = "/api/object_list"
 			            search_key = "last"
 			            search_value = "Baz"
-			            results_key = "results/list"
+			            results_key = "list"
 			            debug = %t
 			         }
 			       `, debug),
-			     Check: resource.ComposeTestCheckFunc(
-			       testAccCheckRestapiObjectExists("data.restapi_object.Baz", "4321", client),
-			       resource.TestCheckResourceAttr("data.restapi_object.Baz", "id", "4321"),
-			       resource.TestCheckResourceAttr("data.restapi_object.Baz", "api_data.first", "Foo"),
-			       resource.TestCheckResourceAttr("data.restapi_object.Baz", "api_data.last", "Baz"),
-			     ),
-			   },
-			*/
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckRestapiObjectExists("data.restapi_object.Baz", "4321", client),
+					resource.TestCheckResourceAttr("data.restapi_object.Baz", "id", "4321"),
+					resource.TestCheckResourceAttr("data.restapi_object.Baz", "api_data.first", "Foo"),
+					resource.TestCheckResourceAttr("data.restapi_object.Baz", "api_data.last", "Baz"),
+				),
+			},
 		},
 	})
 

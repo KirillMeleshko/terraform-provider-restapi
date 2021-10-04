@@ -1,7 +1,64 @@
 #!/bin/bash -e
 
+usage (){
+echo "$0 - Tag and prepare a release
+USAGE: $0 (major|minor|patch|vX.Y.Z)
+The argument may be one of:
+major  - Increments the current major version and performs the release
+minor  - Increments the current minor version and preforms the release
+patch  - Increments the current patch version and preforms the release
+vX.Y.Z - Sets the tag to the value of vX.Y.Z where X=major, Y=minor, and Z=patch
+"
+  exit 1
+}
+
+if [ -z "$1" -o -n "$2" ];then
+  usage
+fi
+
+TAG=`git describe --tags --abbrev=0`
+VERSION="${TAG#[vV]}"
+MAJOR="${VERSION%%\.*}"
+MINOR="${VERSION#*.}"
+MINOR="${MINOR%.*}"
+PATCH="${VERSION##*.}"
+echo "Current tag: v$MAJOR.$MINOR.$PATCH"
+
+#Determine what the user wanted
+case $1 in
+  major)
+    MAJOR=$((MAJOR+1))
+    MINOR=0
+    PATCH=0
+    TAG="v$MAJOR.$MINOR.$PATCH"
+    ;;
+  minor)
+    MINOR=$((MINOR+1))
+    PATCH=0
+    TAG="v$MAJOR.$MINOR.$PATCH"
+    ;;
+  patch)
+    PATCH=$((PATCH+1))
+    TAG="v$MAJOR.$MINOR.$PATCH"
+    ;;
+  v*.*.*)
+    TAG="$1"
+    ;;
+  *.*.*)
+    TAG="v$1"
+    ;;
+  *)
+    usage
+    ;;
+esac
+
+echo "New tag: $TAG"
+
 #Build the docs first
-cd $(dirname $0)/../
+cd $(dirname $0)
+WORK_DIR=$(pwd)
+cd ../
+
 tfpluginwebsite
 DIFFOUTPUT=`git diff docs`
 if [ -n "$DIFFOUTPUT" ];then
@@ -9,78 +66,19 @@ if [ -n "$DIFFOUTPUT" ];then
   git push
 fi
 
-OSs=("darwin" "linux" "windows")
-ARCHs=("386" "amd64")
-
 export REST_API_URI="http://127.0.0.1:8082"
 [[ -z "${GOPATH}" ]] && export GOPATH=$HOME/go
 export CGO_ENABLED=0
 
-#Get into the right directory
-cd $(dirname $0)
-
-#Parse command line params
-CONFIG=$@
-for line in $CONFIG; do
-  eval "$line"
-done
-
-if [[ -z "$github_api_token" && -f github_api_token ]];then
-  github_api_token=$(cat github_api_token)
-fi
-
-if [[ -z "$owner" ]];then
-  owner="Mastercard"
-fi
-
-if [[ -z "$repo" ]];then
-  repo="terraform-provider-restapi"
-fi
-
-if [[ -z "$github_api_token" || -z "$owner" || -z "$repo" || -z "$tag" ]];then
-  echo "USAGE: $0 github_api_token=TOKEN owner=someone repo=somerepo tag=vX.Y.Z"
-  exit 1
-fi
-
-if [[ "$tag" != v* ]];then
-  tag="v$tag"
-fi
-
+#Get into the right directory and build/test
+cd "$WORK_DIR"
 ./test.sh
+cd ../
 
-#Build for all architectures we want
-ARTIFACTS=()
-#for GOOS in darwin linux windows netbsd openbsd solaris;do
+vi .release_info.md
 
-echo "Building..."
-for GOOS in "${OSs[@]}";do
-  for GOARCH in "${ARCHs[@]}";do
-    export GOOS GOARCH
+git commit -m "Changes for $TAG" .release_info.md
 
-    TF_OUT_FILE="terraform-provider-restapi_$tag-$GOOS-$GOARCH"
-    echo "  $TF_OUT_FILE"
-    go build -o "$TF_OUT_FILE" ../
-    ARTIFACTS+=("$TF_OUT_FILE")
-
-    FS_OUT_FILE="fakeserver-$tag-$GOOS-$GOARCH"
-    echo "  $FS_OUT_FILE"
-    go build -o "$FS_OUT_FILE" ../fakeservercli
-    ARTIFACTS+=("$FS_OUT_FILE")
-  done
-done
-
-#Create the release so we can add our files
-./create-github-release.sh github_api_token=$github_api_token owner=$owner repo=$repo tag=$tag draft=false
-
-#Upload all of the files to the release
-for FILE in "${ARTIFACTS[@]}";do
-  ./upload-github-release-asset.sh github_api_token=$github_api_token owner=$owner repo=$repo tag=$tag filename="$FILE"
-done
-
-echo "Cleaning up..."
-rm -f release_info.md
-for GOOS in "${OSs[@]}";do
-  for GOARCH in "${ARCHs[@]}";do
-    rm -f "terraform-provider-restapi_$tag-$GOOS-$GOARCH" "fakeserver-$tag-$GOOS-$GOARCH"
-  done
-done
+git tag $TAG
+git push origin
+git push origin $TAG
