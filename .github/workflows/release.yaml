@@ -28,7 +28,7 @@ jobs:
           PASSPHRASE: ${{ secrets.PASSPHRASE }}
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2.7.0
+        uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
           args: release --parallelism 2 --rm-dist --timeout 1h --release-notes .release_info.md
