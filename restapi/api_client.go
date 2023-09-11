@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/time/rate"
 )
@@ -30,7 +31,9 @@ type apiClientOpt struct {
 	createMethod        string
 	readMethod          string
 	updateMethod        string
+	updateData          string
 	destroyMethod       string
+	destroyData         string
 	copyKeys            []string
 	writeReturnsObject  bool
 	createReturnsObject bool
@@ -61,7 +64,9 @@ type APIClient struct {
 	createMethod        string
 	readMethod          string
 	updateMethod        string
+	updateData          string
 	destroyMethod       string
+	destroyData         string
 	copyKeys            []string
 	writeReturnsObject  bool
 	createReturnsObject bool
@@ -158,7 +163,9 @@ func NewAPIClient(opt *apiClientOpt) (*APIClient, error) {
 		createMethod:        opt.createMethod,
 		readMethod:          opt.readMethod,
 		updateMethod:        opt.updateMethod,
+		updateData:          opt.updateData,
 		destroyMethod:       opt.destroyMethod,
+		destroyData:         opt.destroyData,
 		copyKeys:            opt.copyKeys,
 		writeReturnsObject:  opt.writeReturnsObject,
 		createReturnsObject: opt.createReturnsObject,
@@ -244,7 +251,8 @@ func (client *APIClient) sendRequest(method string, path string, data string) (s
 	}
 
 	if client.oauthConfig != nil {
-		tokenSource := client.oauthConfig.TokenSource(context.Background())
+		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client.httpClient)
+		tokenSource := client.oauthConfig.TokenSource(ctx)
 		token, err := tokenSource.Token()
 		if err != nil {
 			return "", err

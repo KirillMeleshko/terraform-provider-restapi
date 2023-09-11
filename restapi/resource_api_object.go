@@ -22,6 +22,8 @@ func resourceRestAPI() *schema.Resource {
 		Delete: resourceRestAPIDelete,
 		Exists: resourceRestAPIExists,
 
+		Description: "Acting as a wrapper of cURL, this object supports POST, GET, PUT and DELETE on the specified url",
+
 		Importer: &schema.ResourceImporter{
 			State: resourceRestAPIImport,
 		},
@@ -84,7 +86,7 @@ func resourceRestAPI() *schema.Resource {
 			},
 			"data": {
 				Type:        schema.TypeString,
-				Description: "Valid JSON data that this provider will manage with the API server.",
+				Description: "Valid JSON object that this provider will manage with the API server.",
 				Required:    true,
 				Sensitive:   isDataSensitive,
 				ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
@@ -141,6 +143,40 @@ func resourceRestAPI() *schema.Resource {
 				Optional:    true,
 				ForceNew:    true,
 				Description: "Any changes to these values will result in recreating the resource instead of updating.",
+			},
+			"update_data": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Valid JSON object to pass during to update requests.",
+				Sensitive:   isDataSensitive,
+				ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
+					v := val.(string)
+					if v != "" {
+						data := make(map[string]interface{})
+						err := json.Unmarshal([]byte(v), &data)
+						if err != nil {
+							errs = append(errs, fmt.Errorf("update_data attribute is invalid JSON: %v", err))
+						}
+					}
+					return warns, errs
+				},
+			},
+			"destroy_data": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Valid JSON object to pass during to destroy requests.",
+				Sensitive:   isDataSensitive,
+				ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
+					v := val.(string)
+					if v != "" {
+						data := make(map[string]interface{})
+						err := json.Unmarshal([]byte(v), &data)
+						if err != nil {
+							errs = append(errs, fmt.Errorf("destroy_data attribute is invalid JSON: %v", err))
+						}
+					}
+					return warns, errs
+				},
 			},
 		}, /* End schema */
 
@@ -365,8 +401,14 @@ func buildAPIObjectOpts(d *schema.ResourceData) (*apiObjectOpts, error) {
 	if v, ok := d.GetOk("update_method"); ok {
 		opts.updateMethod = v.(string)
 	}
+	if v, ok := d.GetOk("update_data"); ok {
+		opts.updateData = v.(string)
+	}
 	if v, ok := d.GetOk("destroy_method"); ok {
 		opts.destroyMethod = v.(string)
+	}
+	if v, ok := d.GetOk("destroy_data"); ok {
+		opts.destroyData = v.(string)
 	}
 	if v, ok := d.GetOk("destroy_path"); ok {
 		opts.deletePath = v.(string)
